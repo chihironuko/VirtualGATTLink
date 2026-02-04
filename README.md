@@ -1,0 +1,2 @@
+# VirtualGATTLink
+IoTデバイスシェアリング用プロトコル開発
