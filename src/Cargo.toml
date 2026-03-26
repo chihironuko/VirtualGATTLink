@@ -1,0 +1,14 @@
+[package]
+name = "src"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nokhwa = { version = "0.10", features = ["input-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libcamera = "0.7"
+
+[[bin]]
+name = "src"
+path = "main.rs"
