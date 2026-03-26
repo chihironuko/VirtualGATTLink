@@ -1,37 +1,61 @@
 ﻿use nokhwa::query;
 use nokhwa::utils::ApiBackend;
 
-fn main() {
-    let camera_infos = match query(ApiBackend::Auto) {
-        Ok(list) => list,
-        Err(error) => {
-            eprintln!("カメラ一覧の取得に失敗しました: {error}");
-            return;
-        }
-    };
+// すでにカメラ専用のエージェントに見えてきた
+// 外部通信を作成して、通信先に自身が管理できるカメラ一覧を返すとかできそう
+fn detect_nokhwa() -> Result<(), String> {
+    // API設定(OS選択)
+    let camera_infos = query(ApiBackend::Auto).map_err(|e| format!("nokhwa列挙失敗: {e}"))?;
 
     if camera_infos.is_empty() {
-        println!("カメラは見つかりませんでした。");
-        return;
+        println!("[nokhwa] カメラは見つかりませんでした。");
+        return Ok(());
     }
 
-    // 「USB接続らしい」デバイスを、取得情報の文字列から簡易判定
-    let usb_cameras: Vec<_> = camera_infos
-        .iter()
-        .filter(|info| format!("{info:?}").to_lowercase().contains("usb"))
-        .collect();
+    println!("[nokhwa] 検出カメラ数: {}", camera_infos.len());
+    for (i, info) in camera_infos.iter().enumerate() {
+        println!("[nokhwa][{}] {:?}", i + 1, info);
+    }
+    Ok(())
+}
 
-    if usb_cameras.is_empty() {
-        println!("USBと判定できるカメラは見つかりませんでした。");
-        println!("取得できたカメラ一覧:");
-        for (index, info) in camera_infos.iter().enumerate() {
-            println!("[{}] {:?}", index + 1, info);
-        }
-        return;
+#[cfg(target_os = "linux")]
+fn detect_libcamera() -> Result<(), String> {
+    use libcamera::camera_manager::CameraManager;
+
+    let mgr = CameraManager::new().map_err(|e| format!("libcamera初期化失敗: {e}"))?;
+    let cameras = mgr.cameras();
+
+    if cameras.is_empty() {
+        println!("[libcamera] カメラは見つかりませんでした。");
+        return Ok(());
     }
 
-    println!("USB接続カメラ候補: {}", usb_cameras.len());
-    for (index, info) in usb_cameras.iter().enumerate() {
-        println!("[{}] {:?}", index + 1, info);
+    println!("[libcamera] 検出カメラ数: {}", cameras.len());
+    for (i, cam) in cameras.iter().enumerate() {
+        println!("[libcamera][{}] ID: {}", i + 1, cam.id());
+        println!("[libcamera][{}] Properties: {:#?}", i + 1, cam.properties());
     }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn detect_libcamera() -> Result<(), String> {
+    println!("[libcamera] このOSではスキップします。");
+    Ok(())
+}
+
+fn main() {
+    println!("=== Camera Detection Start ===");
+
+    if let Err(e) = detect_nokhwa() {
+        eprintln!("{e}");
+    }
+
+    if let Err(e) = detect_libcamera() {
+        eprintln!("{e}");
+    }
+
+    println!("=== Camera Detection End ===");
 }
